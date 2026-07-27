@@ -8,17 +8,21 @@
 首页
 ├─ 视障导览
 │  └─ 西湖十景
-│     └─ 曲院风荷：情景描述与朗读
+│     ├─ 曲院风荷：情景描述与朗读
+│     ├─ 苏堤春晓：情景描述与朗读
+│     ├─ 平湖秋月：情景描述与朗读
+│     └─ 断桥残雪：情景描述与朗读
 └─ 听障导览
    └─ 西湖十景
       └─ 曲院风荷：视频页面
 ```
 
-其余九景已保留入口位置，但尚未开放。
+视障导览的其余六景，以及听障导览除曲院风荷外的九景，已保留入口位置但尚未开放。
 
 ## 当前功能
 
-- 视障导览：曲院风荷情景描述与浏览器语音朗读。
+- 视障导览：曲院风荷、苏堤春晓、平湖秋月和断桥残雪的完整语音导览；详情页不展示长篇正文，提供播放、停止和重播控制。
+- 定位导览：进入已配置景点范围后自动打开详情页并播放介绍。
 - 听障导览：曲院风荷独立视频页；当前仅保留视频位置，不包含视频文件。
 - 响应式布局：支持桌面和移动端浏览。
 
@@ -28,7 +32,10 @@
 | --- | --- |
 | `/` | 导览类型选择 |
 | `/visual` | 视障导览 · 西湖十景 |
-| `/visual/quyuan-fenghe` | 曲院风荷情景描述与朗读 |
+| `/visual/quyuan-fenghe` | 曲院风荷语音导览 |
+| `/visual/sudi-chunxiao` | 苏堤春晓语音导览 |
+| `/visual/pinghu-qiuyue` | 平湖秋月语音导览 |
+| `/visual/duanqiao-canxue` | 断桥残雪语音导览 |
 | `/hearing` | 听障导览 · 西湖十景 |
 | `/hearing/quyuan-fenghe` | 曲院风荷视频页 |
 
@@ -53,3 +60,6 @@ npm run build
 
 - `quyuan-lake.jpg`：J. Patrick Fischer，Wikimedia Commons，CC BY-SA 3.0。
 - `quyuan-fenghe.jpg`：Mywood，Wikimedia Commons，Public Domain。
+- `sudi-chunxiao.jpg`：[DXR，Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Su_Causeway_near_West_Lake,_looking_towards_north_20120529_1.jpg)，[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)（网页使用缩放版本）。
+- `pinghu-qiuyue.jpg`：[Jeff chenqinyi，Wikimedia Commons](https://commons.wikimedia.org/wiki/File:%E8%A5%BF%E6%B9%96%E5%B9%B3%E6%B9%96%E7%A7%8B%E6%9C%88.JPG)，[CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/)（网页使用缩放版本）。
+- `duanqiao-canxue.jpg`：[94rain，Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Duanqiao_on_a_snowy_day,_Westlake,_Hangzhou_-_20181209.jpg)，[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)。
