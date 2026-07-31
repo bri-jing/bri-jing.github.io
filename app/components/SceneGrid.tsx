@@ -9,16 +9,16 @@ import { T, useI18n } from "../i18n";
 import { publicAsset } from "../site-path";
 
 const scenes = [
-  ["曲院风荷", "Breeze-ruffled Lotus at Quyuan Garden"],
-  ["苏堤春晓", "Spring Dawn at Su Causeway"],
-  ["平湖秋月", "Autumn Moon over the Calm Lake"],
-  ["断桥残雪", "Lingering Snow on Broken Bridge"],
-  ["柳浪闻莺", "Orioles Singing in the Willows"],
-  ["花港观鱼", "Viewing Fish at Flower Harbor"],
-  ["双峰插云", "Twin Peaks Piercing the Clouds"],
-  ["三潭印月", "Three Pools Mirroring the Moon"],
-  ["雷峰夕照", "Leifeng Pagoda in Evening Glow"],
-  ["南屏晚钟", "Evening Bell at Nanping Hill"],
+  { zh: "曲院风荷", en: "Breeze-ruffled Lotus at Quyuan Garden", visualSlug: "quyuan-fenghe", hearingSlug: "quyuan-fenghe", image: "quyuan-lake.jpg" },
+  { zh: "苏堤春晓", en: "Spring Dawn at Su Causeway", visualSlug: "sudi-chunxiao", image: "sudi-chunxiao.jpg" },
+  { zh: "平湖秋月", en: "Autumn Moon over the Calm Lake", visualSlug: "pinghu-qiuyue", image: "pinghu-qiuyue.jpg" },
+  { zh: "断桥残雪", en: "Lingering Snow on Broken Bridge", visualSlug: "duanqiao-canxue", image: "duanqiao-canxue.jpg" },
+  { zh: "柳浪闻莺", en: "Orioles Singing in the Willows" },
+  { zh: "花港观鱼", en: "Viewing Fish at Flower Harbor" },
+  { zh: "双峰插云", en: "Twin Peaks Piercing the Clouds" },
+  { zh: "三潭印月", en: "Three Pools Mirroring the Moon" },
+  { zh: "雷峰夕照", en: "Leifeng Pagoda in Evening Glow" },
+  { zh: "南屏晚钟", en: "Evening Bell at Nanping Hill" },
 ];
 
 type SceneGridProps = {
@@ -38,25 +38,31 @@ export default function SceneGrid({ mode }: SceneGridProps) {
         <h1>{modeName} · <T zh="西湖十景" en="Ten West Lake Scenes" /></h1>
         <LocationGuide mode={mode} />
         <ol className="ten-scenes">
-          {scenes.map(([sceneZh, sceneEn], index) => {
-            const scene = locale === "zh" ? sceneZh : sceneEn;
+          {scenes.map((sceneData, index) => {
+            const scene = locale === "zh" ? sceneData.zh : sceneData.en;
             const number = String(index + 1).padStart(2, "0");
-            if (index === 0) {
+            const slug = mode === "visual"
+              ? sceneData.visualSlug
+              : sceneData.hearingSlug;
+
+            if (slug) {
               return (
                 <li key={scene}>
                   <article
                     className="scene-card active-scene"
-                    style={{ backgroundImage: `url(${publicAsset("quyuan-lake.jpg")})` }}
+                    style={sceneData.image ? { backgroundImage: `url(${publicAsset(sceneData.image)})` } : undefined}
                   >
                     <span>{number}</span>
-                    <Link className="scene-title-link" href={`/${mode}/quyuan-fenghe`}>
+                    <Link className="scene-title-link" href={`/${mode}/${slug}`}>
                       <strong>{scene}</strong>
                     </Link>
                     <div className="scene-actions">
-                      <Link className="scene-detail-link" href={`/${mode}/quyuan-fenghe`}>
+                      <Link className="scene-detail-link" href={`/${mode}/${slug}`}>
                         {locale === "zh" ? "介绍" : "Guide"}
                       </Link>
-                      <WalkingGuide spot={scenicSpotZones[0]} />
+                      {slug === "quyuan-fenghe" && (
+                        <WalkingGuide spot={scenicSpotZones[0]} />
+                      )}
                     </div>
                   </article>
                 </li>

@@ -50,9 +50,13 @@ test("visual and hearing guides have separate ten-scene pages", async () => {
   ]);
 
   assert.match(visual, /href="\/visual\/quyuan-fenghe"/);
+  assert.match(visual, /href="\/visual\/sudi-chunxiao"/);
+  assert.match(visual, /href="\/visual\/pinghu-qiuyue"/);
+  assert.match(visual, /href="\/visual\/duanqiao-canxue"/);
   assert.match(hearing, /href="\/hearing\/quyuan-fenghe"/);
   assert.equal((visual.match(/>去这里<\/button>/g) ?? []).length, 1);
   assert.equal((hearing.match(/>去这里<\/button>/g) ?? []).length, 1);
+  assert.doesNotMatch(hearing, /href="\/hearing\/sudi-chunxiao"/);
 
   const scenes = [
     "曲院风荷",
@@ -89,8 +93,10 @@ test("third-level pages diverge by audience need", async () => {
     htmlFor("/hearing/quyuan-fenghe"),
   ]);
 
-  assert.match(visual, /你面向一片开阔的湖面/);
-  assert.match(visual, /朗读/);
+  assert.match(visual, /曲院风荷/);
+  assert.match(visual, /播放介绍/);
+  assert.match(visual, /重播/);
+  assert.doesNotMatch(visual, /class="guide-copy"/);
   assert.match(hearing, /视频制作中/);
   assert.match(hearing, /Video coming soon/);
   assert.doesNotMatch(visual, /视频制作中/);
@@ -99,17 +105,54 @@ test("third-level pages diverge by audience need", async () => {
   assert.doesNotMatch(hearing, /<small\b/i);
 });
 
+test("four visual guide pages expose images and audio controls", async () => {
+  const [quyuan, sudi, pinghu, duanqiao] = await Promise.all([
+    htmlFor("/visual/quyuan-fenghe"),
+    htmlFor("/visual/sudi-chunxiao"),
+    htmlFor("/visual/pinghu-qiuyue"),
+    htmlFor("/visual/duanqiao-canxue"),
+  ]);
+
+  assert.match(quyuan, /quyuan-lake\.jpg/);
+  assert.match(sudi, /sudi-chunxiao\.jpg/);
+  assert.match(pinghu, /pinghu-qiuyue\.jpg/);
+  assert.match(duanqiao, /duanqiao-canxue\.jpg/);
+
+  for (const html of [quyuan, sudi, pinghu, duanqiao]) {
+    assert.match(html, /播放介绍/);
+    assert.match(html, /重播/);
+    assert.doesNotMatch(html, /class="guide-copy"/);
+  }
+});
+
+test("audio source keeps all four supplied introductions", async () => {
+  const source = await readFile(
+    new URL("../app/data/visual-guides.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /曲院风荷，不只是风与荷，更是时间与美的相遇/);
+  assert.match(source, /苏堤春晓，温和地讲述着苏东坡那样的人生智慧/);
+  assert.match(source, /平湖秋月，是一面水做的镜子，照见湖，也照见你/);
+  assert.match(source, /断桥没有断，雪终将融化/);
+});
+
 test("source keeps distinct route files", async () => {
   const paths = [
     "../app/page.tsx",
     "../app/visual/page.tsx",
     "../app/hearing/page.tsx",
     "../app/visual/quyuan-fenghe/page.tsx",
+    "../app/visual/sudi-chunxiao/page.tsx",
+    "../app/visual/pinghu-qiuyue/page.tsx",
+    "../app/visual/duanqiao-canxue/page.tsx",
     "../app/hearing/quyuan-fenghe/page.tsx",
+    "../app/components/VisualSceneGuide.tsx",
     "../app/components/LocationGuide.tsx",
     "../app/components/WalkingGuide.tsx",
     "../app/components/LegacyPwaCleanup.tsx",
     "../app/data/scenic-spots.ts",
+    "../app/data/visual-guides.ts",
   ];
 
   for (const path of paths) {
@@ -123,7 +166,7 @@ test("source includes complete English guide content", async () => {
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/components/SceneGrid.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/components/LocationGuide.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/visual/quyuan-fenghe/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/data/visual-guides.ts", import.meta.url), "utf8"),
   ]);
   const source = sources.join("\n");
   assert.match(source, /Choose a guide/);
@@ -173,12 +216,19 @@ test("location guide uses the temporary NUS Elm test geofence", async () => {
     new URL("../app/components/LocationGuide.tsx", import.meta.url),
     "utf8",
   );
+  const visualGuideSource = await readFile(
+    new URL("../app/components/VisualSceneGuide.tsx", import.meta.url),
+    "utf8",
+  );
 
   assert.match(scenicSpotSource, /Elm College centre at NUS University Town/);
   assert.match(scenicSpotSource, /coordinate: \[103\.7723762, 1\.3063908\]/);
   assert.match(scenicSpotSource, /triggerRadiusMeters: 100/);
   assert.match(locationGuideSource, /GUIDE_OPEN_DELAY_MS = 3_000/);
   assert.match(locationGuideSource, /3秒后打开导览/);
+  assert.match(locationGuideSource, /\\?autoplay=1/);
+  assert.match(visualGuideSource, /get\("autoplay"\) === "1"/);
+  assert.match(visualGuideSource, /speechSynthesis\.speak\(utterance\)/);
   assert.match(locationGuideSource, /停止定位.*distanceMeters/);
   assert.match(locationGuideSource, /Stop location.*distanceMeters/);
   assert.match(locationGuideSource, /clearTimeout\(navigationTimeoutRef\.current\)/);

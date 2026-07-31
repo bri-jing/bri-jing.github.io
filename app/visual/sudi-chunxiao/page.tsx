@@ -1,6 +1,6 @@
 import VisualSceneGuide from "../../components/VisualSceneGuide";
 import { visualGuides } from "../../data/visual-guides";
 
-export default function VisualQuyuanPage() {
-  return <VisualSceneGuide guide={visualGuides["quyuan-fenghe"]} />;
+export default function VisualSudiPage() {
+  return <VisualSceneGuide guide={visualGuides["sudi-chunxiao"]} />;
 }
