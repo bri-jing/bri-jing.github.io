@@ -31,6 +31,7 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: "1"
           NEXT_PUBLIC_AMAP_KEY: ${{ secrets.VITE_AMAP_KEY }}
+          NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

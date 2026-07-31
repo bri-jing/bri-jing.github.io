@@ -3,6 +3,8 @@
 import Link from "next/link";
 import LocationGuide from "./LocationGuide";
 import SiteHeader from "./SiteHeader";
+import WalkingGuide from "./WalkingGuide";
+import { scenicSpotZones } from "../data/scenic-spots";
 import { T, useI18n } from "../i18n";
 import { publicAsset } from "../site-path";
 
@@ -42,15 +44,21 @@ export default function SceneGrid({ mode }: SceneGridProps) {
             if (index === 0) {
               return (
                 <li key={scene}>
-                  <Link
+                  <article
                     className="scene-card active-scene"
-                    href={`/${mode}/quyuan-fenghe`}
                     style={{ backgroundImage: `url(${publicAsset("quyuan-lake.jpg")})` }}
                   >
                     <span>{number}</span>
-                    <strong>{scene}</strong>
-                    <b aria-hidden="true">→</b>
-                  </Link>
+                    <Link className="scene-title-link" href={`/${mode}/quyuan-fenghe`}>
+                      <strong>{scene}</strong>
+                    </Link>
+                    <div className="scene-actions">
+                      <Link className="scene-detail-link" href={`/${mode}/quyuan-fenghe`}>
+                        {locale === "zh" ? "介绍" : "Guide"}
+                      </Link>
+                      <WalkingGuide spot={scenicSpotZones[0]} />
+                    </div>
+                  </article>
                 </li>
               );
             }

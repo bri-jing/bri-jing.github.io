@@ -250,7 +250,9 @@ a:focus-visible {
 
 .scene-card > span,
 .scene-card > strong,
-.scene-card > b {
+.scene-card > b,
+.scene-title-link,
+.scene-actions {
   position: relative;
   z-index: 2;
 }
@@ -265,6 +267,111 @@ a:focus-visible {
   font-size: clamp(26px, 2.4vw, 38px);
   font-weight: 500;
   line-height: 1.18;
+}
+
+.scene-title-link {
+  width: fit-content;
+}
+
+.scene-title-link strong {
+  font-family: var(--serif);
+  font-size: clamp(26px, 2.4vw, 38px);
+  font-weight: 500;
+  line-height: 1.18;
+}
+
+.scene-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.scene-detail-link,
+.scene-go {
+  display: inline-flex;
+  min-width: 72px;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
+  border: 2px solid currentColor;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.scene-go {
+  border-color: var(--focus);
+  background: var(--focus);
+  color: #173a31;
+}
+
+.scene-go:disabled {
+  cursor: wait;
+  opacity: 0.78;
+}
+
+.walking-guide-panel {
+  position: fixed;
+  right: clamp(14px, 3vw, 42px);
+  bottom: clamp(14px, 3vw, 42px);
+  left: clamp(14px, 3vw, 42px);
+  z-index: 20;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 18px 28px;
+  padding: clamp(22px, 3vw, 34px);
+  border: 3px solid var(--green);
+  background: var(--white);
+  color: var(--green);
+  box-shadow: 0 18px 60px rgba(18, 63, 52, 0.22);
+}
+
+.walking-guide-copy h2,
+.walking-guide-copy p {
+  margin: 0;
+}
+
+.walking-guide-copy h2 {
+  font-family: var(--serif);
+  font-size: clamp(28px, 3vw, 42px);
+}
+
+.walking-guide-copy > p:not(.walking-guide-meta) {
+  margin-top: 10px;
+  font-size: clamp(20px, 2vw, 28px);
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.walking-guide-meta {
+  margin-top: 8px !important;
+  font-size: 17px;
+}
+
+.walking-guide-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.walking-guide-actions button {
+  min-width: 92px;
+  min-height: 54px;
+  padding: 10px 16px;
+  border: 0;
+  background: var(--green);
+  color: white;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.walking-guide-actions .walking-guide-stop {
+  border: 2px solid var(--green);
+  background: transparent;
+  color: var(--green);
 }
 
 .scene-card > b {
@@ -542,6 +649,14 @@ a:focus-visible {
 
   .scene-card > strong {
     font-size: 28px;
+  }
+
+  .walking-guide-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .walking-guide-actions button {
+    flex: 1;
   }
 
   .visual-detail-main {

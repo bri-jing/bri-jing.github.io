@@ -51,6 +51,8 @@ test("visual and hearing guides have separate ten-scene pages", async () => {
 
   assert.match(visual, /href="\/visual\/quyuan-fenghe"/);
   assert.match(hearing, /href="\/hearing\/quyuan-fenghe"/);
+  assert.equal((visual.match(/>去这里<\/button>/g) ?? []).length, 1);
+  assert.equal((hearing.match(/>去这里<\/button>/g) ?? []).length, 1);
 
   const scenes = [
     "曲院风荷",
@@ -105,6 +107,7 @@ test("source keeps distinct route files", async () => {
     "../app/visual/quyuan-fenghe/page.tsx",
     "../app/hearing/quyuan-fenghe/page.tsx",
     "../app/components/LocationGuide.tsx",
+    "../app/components/WalkingGuide.tsx",
     "../app/components/LegacyPwaCleanup.tsx",
     "../app/data/scenic-spots.ts",
   ];
@@ -129,6 +132,38 @@ test("source includes complete English guide content", async () => {
   assert.match(source, /You are facing an open stretch of water/);
 });
 
+test("Quyuan card provides an in-page AMap walking voice guide", async () => {
+  const [source, googleRouteSource, sceneGridSource] = await Promise.all([
+    readFile(
+      new URL("../app/components/WalkingGuide.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../app/components/google-walking-route.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(new URL("../app/components/SceneGrid.tsx", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(source, /AMap\.Walking/);
+  assert.match(source, /speechSynthesis/);
+  assert.match(source, /POSITION_INTERVAL_MS = 8_000/);
+  assert.match(source, /AMAP_ROUTE_TIMEOUT_MS = 8_000/);
+  assert.match(source, /AMap route timeout/);
+  assert.match(source, /tryGoogleRoute/);
+  assert.match(source, /tryGoogleFromBrowserLocation/);
+  assert.match(source, /NEXT_PUBLIC_GOOGLE_MAPS_API_KEY/);
+  assert.match(source, /Google 备用服务未配置/);
+  assert.match(googleRouteSource, /Route\.computeRoutes/);
+  assert.match(googleRouteSource, /travelMode: "WALKING"/);
+  assert.match(
+    googleRouteSource,
+    /fields: \["distanceMeters", "durationMillis", "legs"\]/,
+  );
+  assert.doesNotMatch(source, /accessibility-verified route/);
+  assert.match(sceneGridSource, /scenicSpotZones\[0\]/);
+});
+
 test("location guide uses the temporary NUS Elm test geofence", async () => {
   const scenicSpotSource = await readFile(
     new URL("../app/data/scenic-spots.ts", import.meta.url),
@@ -147,4 +182,15 @@ test("location guide uses the temporary NUS Elm test geofence", async () => {
   assert.match(locationGuideSource, /停止定位.*distanceMeters/);
   assert.match(locationGuideSource, /Stop location.*distanceMeters/);
   assert.match(locationGuideSource, /clearTimeout\(navigationTimeoutRef\.current\)/);
+});
+
+test("GitHub Pages build targets the organization root site", async () => {
+  const [nextConfigSource, packageSource] = await Promise.all([
+    readFile(new URL("../next.config.ts", import.meta.url), "utf8"),
+    readFile(new URL("../package.json", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(nextConfigSource, /process\.env\.NEXT_PUBLIC_BASE_PATH \?\? ""/);
+  assert.doesNotMatch(nextConfigSource, /\/WestLakeProject/);
+  assert.doesNotMatch(packageSource, /NEXT_PUBLIC_BASE_PATH=\/WestLakeProject/);
 });
