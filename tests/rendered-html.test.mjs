@@ -54,7 +54,7 @@ test("visual and hearing guides have separate ten-scene pages", async () => {
   assert.match(visual, /href="\/visual\/pinghu-qiuyue"/);
   assert.match(visual, /href="\/visual\/duanqiao-canxue"/);
   assert.match(hearing, /href="\/hearing\/quyuan-fenghe"/);
-  assert.equal((visual.match(/>去这里<\/button>/g) ?? []).length, 1);
+  assert.equal((visual.match(/>去这里<\/button>/g) ?? []).length, 4);
   assert.equal((hearing.match(/>去这里<\/button>/g) ?? []).length, 1);
   assert.doesNotMatch(hearing, /href="\/hearing\/sudi-chunxiao"/);
 
@@ -175,7 +175,7 @@ test("source includes complete English guide content", async () => {
   assert.match(source, /You are facing an open stretch of water/);
 });
 
-test("Quyuan card provides an in-page AMap walking voice guide", async () => {
+test("four scenic cards provide in-page AMap walking voice guides", async () => {
   const [source, googleRouteSource, sceneGridSource] = await Promise.all([
     readFile(
       new URL("../app/components/WalkingGuide.tsx", import.meta.url),
@@ -204,10 +204,11 @@ test("Quyuan card provides an in-page AMap walking voice guide", async () => {
     /fields: \["distanceMeters", "durationMillis", "legs"\]/,
   );
   assert.doesNotMatch(source, /accessibility-verified route/);
-  assert.match(sceneGridSource, /scenicSpotZones\[0\]/);
+  assert.match(sceneGridSource, /scenicSpotZones\.find/);
+  assert.match(sceneGridSource, /<WalkingGuide spot=\{scenicSpot\}/);
 });
 
-test("location guide uses the temporary NUS Elm test geofence", async () => {
+test("location guide uses four West Lake AMap geofences", async () => {
   const scenicSpotSource = await readFile(
     new URL("../app/data/scenic-spots.ts", import.meta.url),
     "utf8",
@@ -221,9 +222,19 @@ test("location guide uses the temporary NUS Elm test geofence", async () => {
     "utf8",
   );
 
-  assert.match(scenicSpotSource, /Elm College centre at NUS University Town/);
-  assert.match(scenicSpotSource, /coordinate: \[103\.7723762, 1\.3063908\]/);
-  assert.match(scenicSpotSource, /triggerRadiusMeters: 100/);
+  assert.doesNotMatch(scenicSpotSource, /NUS|Elm College/);
+  assert.match(scenicSpotSource, /coordinate: \[120\.133333, 30\.249287\]/);
+  assert.match(scenicSpotSource, /coordinate: \[120\.13796, 30\.24388\]/);
+  assert.match(scenicSpotSource, /coordinate: \[120\.146142, 30\.252244\]/);
+  assert.match(scenicSpotSource, /coordinate: \[120\.151347, 30\.258151\]/);
+  assert.equal(
+    (scenicSpotSource.match(/triggerRadiusMeters: 100/g) ?? []).length,
+    4,
+  );
+  assert.match(
+    locationGuideSource,
+    /filter\(\(spot\) => Boolean\(spot\.routes\[mode\]\)\)/,
+  );
   assert.match(locationGuideSource, /GUIDE_OPEN_DELAY_MS = 3_000/);
   assert.match(locationGuideSource, /3秒后打开导览/);
   assert.match(locationGuideSource, /\\?autoplay=1/);

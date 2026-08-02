@@ -44,6 +44,9 @@ export default function SceneGrid({ mode }: SceneGridProps) {
             const slug = mode === "visual"
               ? sceneData.visualSlug
               : sceneData.hearingSlug;
+            const scenicSpot = scenicSpotZones.find(
+              (spot) => spot.id === slug,
+            );
 
             if (slug) {
               return (
@@ -60,8 +63,8 @@ export default function SceneGrid({ mode }: SceneGridProps) {
                       <Link className="scene-detail-link" href={`/${mode}/${slug}`}>
                         {locale === "zh" ? "介绍" : "Guide"}
                       </Link>
-                      {slug === "quyuan-fenghe" && (
-                        <WalkingGuide spot={scenicSpotZones[0]} />
+                      {scenicSpot && (
+                        <WalkingGuide spot={scenicSpot} />
                       )}
                     </div>
                   </article>

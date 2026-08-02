@@ -6,21 +6,50 @@ export type ScenicSpotZone = {
   nameEn: string;
   coordinate: readonly [longitude: number, latitude: number];
   triggerRadiusMeters: number;
-  routes: Record<GuideMode, string>;
+  routes: Partial<Record<GuideMode, string>>;
 };
 
-// Temporary test geofence: the Elm College centre at NUS University Town.
-// The 100 m radius covers Elm Dining Hall and must be restored before field use.
+// AMap POI coordinates (GCJ-02), retrieved from AMap Place Search on 2026-08-02.
 export const scenicSpotZones: readonly ScenicSpotZone[] = [
   {
     id: "quyuan-fenghe",
     name: "曲院风荷",
     nameEn: "Quyuan Garden",
-    coordinate: [103.7723762, 1.3063908],
+    coordinate: [120.133333, 30.249287],
     triggerRadiusMeters: 100,
     routes: {
       visual: "/visual/quyuan-fenghe",
       hearing: "/hearing/quyuan-fenghe",
+    },
+  },
+  {
+    id: "sudi-chunxiao",
+    name: "苏堤春晓",
+    nameEn: "Spring Dawn at Su Causeway",
+    coordinate: [120.13796, 30.24388],
+    triggerRadiusMeters: 100,
+    routes: {
+      visual: "/visual/sudi-chunxiao",
+    },
+  },
+  {
+    id: "pinghu-qiuyue",
+    name: "平湖秋月",
+    nameEn: "Autumn Moon over the Calm Lake",
+    coordinate: [120.146142, 30.252244],
+    triggerRadiusMeters: 100,
+    routes: {
+      visual: "/visual/pinghu-qiuyue",
+    },
+  },
+  {
+    id: "duanqiao-canxue",
+    name: "断桥残雪",
+    nameEn: "Lingering Snow on Broken Bridge",
+    coordinate: [120.151347, 30.258151],
+    triggerRadiusMeters: 100,
+    routes: {
+      visual: "/visual/duanqiao-canxue",
     },
   },
 ];

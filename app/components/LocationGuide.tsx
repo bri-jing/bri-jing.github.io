@@ -124,10 +124,13 @@ export default function LocationGuide({ mode }: { mode: GuideMode }) {
       }
 
       const nearest = scenicSpotZones
+        .filter((spot) => Boolean(spot.routes[mode]))
         .map((spot) => ({ spot, distance: distanceInMeters(coordinate, spot.coordinate) }))
         .sort((first, second) => first.distance - second.distance)[0];
 
       if (!nearest) return;
+      const route = nearest.spot.routes[mode];
+      if (!route) return;
       const roundedDistance = Math.round(nearest.distance);
       setDistanceMeters(roundedDistance);
       if (nearest.distance <= nearest.spot.triggerRadiusMeters && !triggeredRef.current) {
@@ -135,7 +138,7 @@ export default function LocationGuide({ mode }: { mode: GuideMode }) {
         setMessage({ zh: `已到达${nearest.spot.name}，3秒后打开导览。`, en: `You have reached ${nearest.spot.nameEn}. Opening the guide in 3 seconds.` });
         navigationTimeoutRef.current = setTimeout(() => {
           navigationTimeoutRef.current = null;
-          router.push(`${nearest.spot.routes[mode]}?autoplay=1`);
+          router.push(`${route}?autoplay=1`);
         }, GUIDE_OPEN_DELAY_MS);
         return;
       }
