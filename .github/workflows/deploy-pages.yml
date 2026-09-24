@@ -27,11 +27,15 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run lint
+      - run: npm run test:unit
       - run: npm run build:pages
         env:
           NEXT_TELEMETRY_DISABLED: "1"
           NEXT_PUBLIC_AMAP_KEY: ${{ secrets.VITE_AMAP_KEY }}
-          NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+          NEXT_PUBLIC_AMAP_SECURITY_CODE: ${{ secrets.AMAP_SECURITY_CODE }}
+          NEXT_PUBLIC_AMAP_SERVICE_HOST: ${{ vars.AMAP_SERVICE_HOST }}
+      - run: npm run test:pages
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

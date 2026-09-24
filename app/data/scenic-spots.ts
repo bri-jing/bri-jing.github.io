@@ -1,4 +1,5 @@
-export type GuideMode = "visual" | "hearing";
+export type Coordinate = readonly [longitude: number, latitude: number];
+export type GuideMode = "visual";
 
 export type ScenicSpotZone = {
   id: string;
@@ -6,10 +7,13 @@ export type ScenicSpotZone = {
   nameEn: string;
   coordinate: readonly [longitude: number, latitude: number];
   triggerRadiusMeters: number;
-  routes: Partial<Record<GuideMode, string>>;
+  routes: Record<GuideMode, string>;
+  poiId?: string;
+  walkingDestination?: { name: string; nameEn: string; coordinate: Coordinate; poiId: string };
 };
 
-// AMap POI coordinates (GCJ-02), retrieved from AMap Place Search on 2026-08-02.
+// GCJ-02 coordinates from AMap Place Search. First four: 2026-08-02; remaining POIs: 2026-09-23.
+// Island geofences and mainland walking destinations intentionally differ.
 export const scenicSpotZones: readonly ScenicSpotZone[] = [
   {
     id: "quyuan-fenghe",
@@ -19,7 +23,6 @@ export const scenicSpotZones: readonly ScenicSpotZone[] = [
     triggerRadiusMeters: 100,
     routes: {
       visual: "/visual/quyuan-fenghe",
-      hearing: "/hearing/quyuan-fenghe",
     },
   },
   {
@@ -51,6 +54,37 @@ export const scenicSpotZones: readonly ScenicSpotZone[] = [
     routes: {
       visual: "/visual/duanqiao-canxue",
     },
+  },
+  {
+    id: "liulang-wenying", name: "柳浪闻莺", nameEn: "Orioles Singing in the Willows",
+    coordinate: [120.156326, 30.240389], poiId: "B023B0247C", triggerRadiusMeters: 100,
+    routes: { visual: "/visual/liulang-wenying" },
+  },
+  {
+    id: "huagang-guanyu", name: "花港观鱼", nameEn: "Viewing Fish at Flower Harbor",
+    coordinate: [120.139095, 30.230233], poiId: "B023B023B2", triggerRadiusMeters: 100,
+    routes: { visual: "/visual/huagang-guanyu" },
+  },
+  {
+    id: "shuangfeng-chayun", name: "双峰插云", nameEn: "Twin Peaks Piercing the Clouds",
+    coordinate: [120.122581, 30.247511], poiId: "B023B025E0", triggerRadiusMeters: 100,
+    routes: { visual: "/visual/shuangfeng-chayun" },
+  },
+  {
+    id: "santan-yinyue", name: "三潭印月", nameEn: "Three Pools Mirroring the Moon",
+    coordinate: [120.145369, 30.238845], poiId: "B023B0283D", triggerRadiusMeters: 100,
+    routes: { visual: "/visual/santan-yinyue" },
+    walkingDestination: { name: "三潭印月花港观鱼码头", nameEn: "Huagang Guanyu boat pier", coordinate: [120.143207, 30.231184], poiId: "B023B18MLB" },
+  },
+  {
+    id: "leifeng-xizhao", name: "雷峰夕照", nameEn: "Leifeng Pagoda",
+    coordinate: [120.148849, 30.230934], poiId: "B023B09LKR", triggerRadiusMeters: 100,
+    routes: { visual: "/visual/leifeng-xizhao" },
+  },
+  {
+    id: "nanping-wanzhong", name: "南屏晚钟", nameEn: "Jingci Temple",
+    coordinate: [120.149165, 30.228643], poiId: "B023B015DA", triggerRadiusMeters: 100,
+    routes: { visual: "/visual/nanping-wanzhong" },
   },
 ];
 

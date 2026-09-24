@@ -10,9 +10,12 @@
     "build": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext build",
     "build:pages": "NEXT_TELEMETRY_DISABLED=1 GITHUB_PAGES=true next build",
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
-    "test": "npm run build && node --test tests/rendered-html.test.mjs",
+    "test": "npm run test:unit && npm run build:pages && npm run test:pages",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "test:unit": "node --import tsx --test tests/navigation.test.ts",
+    "test:pages": "node --test tests/rendered-html.test.mjs",
+    "dev:pages": "NEXT_TELEMETRY_DISABLED=1 next dev"
   },
   "dependencies": {
     "@amap/amap-jsapi-loader": "^1.0.1",
@@ -37,7 +40,8 @@
     "typescript": "5.9.3",
     "vinext": "0.0.50",
     "vite": "8.0.13",
-    "wrangler": "4.92.0"
+    "wrangler": "4.92.0",
+    "tsx": "4.22.1"
   },
   "type": "module"
 }

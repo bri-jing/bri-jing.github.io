@@ -6,8 +6,13 @@ const CLEANUP_MARKER = "westlake-legacy-pwa-cleared-v1";
 
 export default function LegacyPwaCleanup() {
   useEffect(() => {
-    if (window.sessionStorage.getItem(CLEANUP_MARKER)) return;
-    window.sessionStorage.setItem(CLEANUP_MARKER, "true");
+    try {
+      if (window.sessionStorage.getItem(CLEANUP_MARKER)) return;
+      window.sessionStorage.setItem(CLEANUP_MARKER, "true");
+    } catch {
+      // Restricted storage must not prevent the guide from mounting.
+      return;
+    }
 
     const cleanup = async () => {
       const controlled = Boolean(navigator.serviceWorker?.controller);
@@ -25,7 +30,7 @@ export default function LegacyPwaCleanup() {
       if (controlled) window.location.reload();
     };
 
-    void cleanup();
+    void cleanup().catch(() => undefined);
   }, []);
 
   return null;

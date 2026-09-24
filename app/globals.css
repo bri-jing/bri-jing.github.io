@@ -782,3 +782,54 @@ a:focus-visible {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Shared audio-first guide layout. */
+.skip-link { position: absolute; top: -100px; left: 20px; z-index: 100; padding: 16px; background: var(--green); color: white; }
+.skip-link:focus { top: 10px; }
+.eyebrow { margin: 0 0 18px; font-size: 15px; font-weight: 700; letter-spacing: .08em; }
+.scene-main > h1 { margin-bottom: 24px; }
+.scene-intro { margin: 0 0 32px; font-size: 20px; line-height: 1.7; }
+.location-guide { flex-wrap: wrap; align-items: center; gap: 16px 24px; }
+.location-guide p { flex: 1 1 260px; margin: 0; line-height: 1.7; }
+.ten-scenes { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.scene-card { min-height: 290px; gap: 24px; overflow: visible; }
+.scene-card h2 { position: relative; z-index: 2; margin: 0; font-family: var(--serif); font-size: clamp(27px, 2.4vw, 38px); font-weight: 500; line-height: 1.4; }
+.scene-actions { flex-wrap: wrap; }
+.scene-detail-link, .scene-go { flex: 1; white-space: nowrap; }
+.scene-card::before { background: linear-gradient(180deg, rgba(8, 32, 26, .57), rgba(8, 32, 26, .83)); }
+.site-note { margin: 28px 0 0; max-width: 78ch; line-height: 1.8; }
+.description-panel { gap: 24px; padding: clamp(28px, 4vw, 64px); justify-content: flex-start; }
+.description-panel h1 { font-size: clamp(42px, 5vw, 78px); line-height: 1.2; overflow-wrap: anywhere; }
+.visit-note, .playback-status { margin: 0; font-size: 18px; line-height: 1.8; }
+.detail-photo { min-height: 660px; }
+.read-button, .replay-button { min-width: 150px; flex: 1; padding: 12px 20px; }
+.guide-transcript { border-top: 1px solid var(--line); padding-top: 16px; }
+summary { min-height: 48px; padding: 12px 4px; cursor: pointer; font-size: 18px; font-weight: 700; }
+summary:focus-visible { outline: 4px solid var(--focus); outline-offset: 2px; }
+.guide-copy { font-size: 19px; line-height: 1.9; }
+.image-credit { font-size: 13px; line-height: 1.7; }
+.image-credit a, .map-link { text-decoration: underline; text-underline-offset: 4px; }
+.language-switch:disabled { opacity: .6; cursor: default; }
+dialog.walking-guide-panel { position: fixed; inset: 0; width: min(760px, calc(100% - 28px)); max-height: calc(100dvh - 36px); margin: auto; overflow-y: auto; display: none; grid-template-columns: 1fr; }
+dialog.walking-guide-panel[open] { display: grid; }
+dialog.walking-guide-panel::backdrop { background: rgba(8, 24, 20, .6); }
+.walking-guide-actions { flex-wrap: wrap; }
+.walking-guide-copy > p.walking-note { font-size: 16px; font-weight: 400; line-height: 1.7; margin: 16px 0; }
+.map-link { display: inline-block; padding: 12px 0; min-height: 48px; font-weight: 700; }
+.route-steps { padding-left: 28px; line-height: 1.8; }
+.route-steps li { padding: 8px 4px; }
+.route-steps [aria-current] { background: var(--green-soft); font-weight: 700; }
+@media (max-width: 1200px) { .ten-scenes { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 760px) {
+  .ten-scenes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .minimal-header { gap: 10px; flex-wrap: wrap; }
+  .scene-card { min-height: 270px; padding: 22px 18px; }
+  .scene-actions { gap: 8px; }
+  .scene-detail-link, .scene-go { padding: 10px; }
+  .detail-photo { min-height: 38vh; }
+  .description-panel { min-height: auto; padding: 36px 22px; }
+  .audio-controls { flex-direction: column; }
+  .audio-controls button { width: 100%; }
+  .walking-guide-actions button { flex: 1 1 130px; }
+}
+@media (max-width: 440px) { .ten-scenes { grid-template-columns: 1fr; } .scene-card { min-height: 240px; } }

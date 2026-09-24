@@ -4,6 +4,8 @@ import { createContext, useContext, useEffect, useState } from "react";
 
 export type Locale = "zh" | "en";
 
+export const ENGLISH_READY = false;
+
 const STORAGE_KEY = "westlake-guide-locale";
 const I18nContext = createContext<{
   locale: Locale;
@@ -14,8 +16,9 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>("zh");
 
   useEffect(() => {
-    const saved = window.localStorage.getItem(STORAGE_KEY);
-    if (saved !== "en") return;
+    let saved: string | null = null;
+    try { saved = window.localStorage.getItem(STORAGE_KEY); } catch { /* Storage may be disabled. */ }
+    if (saved !== "en" || !ENGLISH_READY) return;
     const timer = window.setTimeout(() => setLocaleState("en"), 0);
     return () => window.clearTimeout(timer);
   }, []);
@@ -26,7 +29,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
 
   const setLocale = (next: Locale) => {
     setLocaleState(next);
-    window.localStorage.setItem(STORAGE_KEY, next);
+    try { window.localStorage.setItem(STORAGE_KEY, next); } catch { /* Keep the in-memory preference. */ }
   };
 
   return <I18nContext.Provider value={{ locale, setLocale }}>{children}</I18nContext.Provider>;

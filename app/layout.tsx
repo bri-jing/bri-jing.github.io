@@ -6,7 +6,7 @@ import LegacyPwaCleanup from "./components/LegacyPwaCleanup";
 
 export const metadata: Metadata = {
   title: "西湖无障碍导览 | Accessible West Lake Guide",
-  description: "西湖十景视障与听障中英双语导览。Bilingual accessible guide to West Lake.",
+  description: "面向视障游客的西湖十景语音讲解、定位与步行导览。Accessible audio guides to the ten scenes of West Lake.",
 };
 
 export default function RootLayout({

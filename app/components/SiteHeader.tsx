@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { T, useI18n } from "../i18n";
+import { ENGLISH_READY, T, useI18n } from "../i18n";
 
 type SiteHeaderProps = {
   backHref?: string;
@@ -13,6 +13,7 @@ export default function SiteHeader({ backHref, backLabel = "返回", backLabelEn
   const { locale, setLocale } = useI18n();
   return (
     <header className="minimal-header">
+      <a className="skip-link" href="#main-content">{locale === "zh" ? "跳到主要内容" : "Skip to content"}</a>
       <Link className="minimal-brand" href="/" aria-label={locale === "zh" ? "西湖无障碍导览首页" : "Accessible West Lake Guide home"}>
         <span aria-hidden="true">湖</span>
         <strong><T zh="西湖无障碍导览" en="Accessible West Lake" /></strong>
@@ -23,7 +24,7 @@ export default function SiteHeader({ backHref, backLabel = "返回", backLabelEn
             <span aria-hidden="true">←</span> {locale === "zh" ? backLabel : backLabelEn}
           </Link>
         ) : null}
-        <button className="language-switch" type="button" onClick={() => setLocale(locale === "zh" ? "en" : "zh")} aria-label={locale === "zh" ? "Switch to English" : "切换到中文"}>
+        <button disabled={!ENGLISH_READY} title={ENGLISH_READY ? undefined : "英文完整讲解校验后开放"} className="language-switch" type="button" onClick={() => setLocale(locale === "zh" ? "en" : "zh")} aria-label={!ENGLISH_READY ? "英文讲解准备中，暂不可切换" : locale === "zh" ? "Switch to English" : "切换到中文"}>
           {locale === "zh" ? "EN" : "中"}
         </button>
       </div>

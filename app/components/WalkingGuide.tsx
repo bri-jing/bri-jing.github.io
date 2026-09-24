@@ -1,459 +1,139 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import {
-  distanceInMeters,
-  type ScenicSpotZone,
-} from "../data/scenic-spots";
+import { distanceInMeters, type Coordinate, type ScenicSpotZone } from "../data/scenic-spots";
+import { visitNotes } from "../data/visit-notes";
 import { useI18n } from "../i18n";
-import { planGoogleWalkingRoute } from "./google-walking-route";
+import { getLocation, mapErrorMessage, planWalkingRoute, type WalkingRoute } from "./amap-service";
+import { confidentlyNear, routeProgress, usableAccuracy } from "./route-geometry";
 
-type LngLatLike = {
-  lng?: number;
-  lat?: number;
-  getLng?: () => number;
-  getLat?: () => number;
-};
+type State = "idle" | "loading" | "active" | "uncertain" | "off-route" | "arrived" | "error";
 
-type GeolocationResult = {
-  accuracy?: number;
-  info?: string;
-  message?: string;
-  originMessage?: string;
-  position?: LngLatLike;
-};
-
-type GeolocationService = {
-  getCurrentPosition: (
-    callback: (status: string, result: GeolocationResult) => void,
-  ) => void;
-};
-
-type WalkStep = {
-  instruction?: string;
-  distance?: number;
-  end_location?: LngLatLike;
-};
-
-type WalkingResult = {
-  info?: string;
-  message?: string;
-  routes?: Array<{
-    distance?: number;
-    time?: number;
-    steps?: WalkStep[];
-  }>;
-};
-
-type AMapNamespace = {
-  Geolocation: new (options: {
-    enableHighAccuracy: boolean;
-    timeout: number;
-  }) => GeolocationService;
-  LngLat: new (longitude: number, latitude: number) => LngLatLike;
-  Walking: new () => {
-    search: (
-      origin: LngLatLike,
-      destination: LngLatLike,
-      callback: (status: string, result: WalkingResult) => void,
-    ) => void;
-  };
-};
-
-declare global {
-  interface Window {
-    _AMapSecurityConfig?: { securityJsCode: string };
-  }
-}
-
-const POSITION_INTERVAL_MS = 8_000;
-const AMAP_ROUTE_TIMEOUT_MS = 8_000;
-const STEP_REACHED_METERS = 25;
-const DESTINATION_REACHED_METERS = 35;
-
-function readCoordinate(value?: LngLatLike) {
-  if (!value) return null;
-  const longitude = value.getLng?.() ?? value.lng;
-  const latitude = value.getLat?.() ?? value.lat;
-
-  if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) return null;
-  return [longitude as number, latitude as number] as const;
-}
-
-export default function WalkingGuide({ spot }: { spot: ScenicSpotZone }) {
+export default function WalkingGuide({ spot, onClose }: { spot: ScenicSpotZone; onClose: () => void }) {
   const { locale } = useI18n();
-  const geolocationRef = useRef<GeolocationService | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const routeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const stepsRef = useRef<WalkStep[]>([]);
-  const stepIndexRef = useRef(0);
-  const [state, setState] = useState<
-    "idle" | "loading" | "active" | "arrived" | "error"
-  >("idle");
-  const [instruction, setInstruction] = useState("");
-  const [distanceMeters, setDistanceMeters] = useState<number | null>(null);
-  const [durationMinutes, setDurationMinutes] = useState<number | null>(null);
-  const [routeProvider, setRouteProvider] = useState<"amap" | "google" | null>(
-    null,
-  );
-
-  const destination = spot.coordinate;
-
-  const speak = (zh: string, en: string) => {
-    if (!("speechSynthesis" in window) || !("SpeechSynthesisUtterance" in window)) {
-      return;
-    }
-
-    window.speechSynthesis.cancel();
-    const text = locale === "zh" ? zh : en;
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = /[\u3400-\u9fff]/.test(text) ? "zh-CN" : "en-US";
-    utterance.rate = 0.9;
-    window.speechSynthesis.speak(utterance);
-  };
-
-  const clearTracking = () => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    if (routeTimeoutRef.current) clearTimeout(routeTimeoutRef.current);
-    intervalRef.current = null;
-    routeTimeoutRef.current = null;
-    geolocationRef.current = null;
-  };
-
-  const stop = () => {
-    clearTracking();
-    window.speechSynthesis?.cancel();
-    stepsRef.current = [];
-    stepIndexRef.current = 0;
-    setState("idle");
-    setInstruction("");
-    setDistanceMeters(null);
-    setDurationMinutes(null);
-    setRouteProvider(null);
-  };
+  const destination = spot.walkingDestination ?? spot;
+  const dialog = useRef<HTMLDialogElement>(null);
+  const generation = useRef(0);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSpoken = useRef("");
+  const [state, setState] = useState<State>("idle");
+  const [message, setMessage] = useState("");
+  const [route, setRoute] = useState<WalkingRoute | null>(null);
+  const [remaining, setRemaining] = useState<number | null>(null);
+  const [origin, setOrigin] = useState<Coordinate | null>(null);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [speechError, setSpeechError] = useState(false);
+  const [accuracy, setAccuracy] = useState<number | undefined>();
+  const localized = (zh: string, en: string) => locale === "zh" ? zh : en;
 
   useEffect(() => {
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const session = generation;
+    dialog.current?.showModal();
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      if (routeTimeoutRef.current) clearTimeout(routeTimeoutRef.current);
+      session.current++;
+      if (timer.current) clearTimeout(timer.current);
       window.speechSynthesis?.cancel();
+      previousFocus?.focus();
     };
   }, []);
 
-  const updateProgressFrom = (current: readonly [number, number]) => {
-      const destinationDistance = Math.round(
-        distanceInMeters(current, destination),
-      );
-      setDistanceMeters(destinationDistance);
-
-      if (destinationDistance <= DESTINATION_REACHED_METERS) {
-        clearTracking();
-        setState("arrived");
-        const text = locale === "zh" ? `已到达${spot.name}` : `You have arrived at ${spot.nameEn}`;
-        setInstruction(text);
-        speak(`已到达${spot.name}`, `You have arrived at ${spot.nameEn}`);
-        return;
-      }
-
-      const currentStep = stepsRef.current[stepIndexRef.current];
-      const stepEnd = readCoordinate(currentStep?.end_location);
-      if (!stepEnd || distanceInMeters(current, stepEnd) > STEP_REACHED_METERS) {
-        return;
-      }
-
-      const nextIndex = stepIndexRef.current + 1;
-      const nextStep = stepsRef.current[nextIndex];
-      if (!nextStep?.instruction) return;
-
-      stepIndexRef.current = nextIndex;
-      setInstruction(nextStep.instruction);
-      speak(nextStep.instruction, nextStep.instruction);
+  const speak = (text: string) => {
+    if (!("speechSynthesis" in window) || !("SpeechSynthesisUtterance" in window)) { setSpeechError(true); return; }
+    lastSpoken.current = text;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = /[\u3400-\u9fff]/.test(text) ? "zh-CN" : "en-US";
+    utterance.rate = 0.9;
+    const run = generation.current;
+    utterance.onerror = (event) => { if (run === generation.current && !["canceled", "interrupted"].includes(event.error)) setSpeechError(true); };
+    window.speechSynthesis.speak(utterance);
   };
 
-  const updateProgress = () => {
-    if (geolocationRef.current) {
-      geolocationRef.current.getCurrentPosition((status, result) => {
-        if (status !== "complete") return;
-        const current = readCoordinate(result.position);
-        if (current) updateProgressFrom(current);
-      });
-      return;
-    }
-
-    navigator.geolocation?.getCurrentPosition((position) => {
-      updateProgressFrom([
-        position.coords.longitude,
-        position.coords.latitude,
-      ]);
-    });
-  };
-
-  const beginRoute = ({
-    steps,
-    distance,
-    duration,
-    provider,
-  }: {
-    steps: WalkStep[];
-    distance: number;
-    duration: number;
-    provider: "amap" | "google";
-  }) => {
-    stepsRef.current = steps;
-    stepIndexRef.current = 0;
-    setState("active");
-    setRouteProvider(provider);
-    setDistanceMeters(distance);
-    setDurationMinutes(duration);
-    setInstruction(steps[0].instruction ?? "");
-    speak(
-      `路线已开始。${steps[0].instruction}`,
-      `Route started. ${steps[0].instruction}`,
-    );
-    intervalRef.current = setInterval(updateProgress, POSITION_INTERVAL_MS);
-  };
-
-  const tryGoogleRoute = async (
-    origin: readonly [number, number],
-    amapDetail?: string,
-  ) => {
-    const googleKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim();
-    if (!googleKey) {
-      setState("error");
-      setInstruction(
-        locale === "zh"
-          ? `高德路线不可用${amapDetail ? `：${amapDetail}` : ""}，Google 备用服务未配置`
-          : `AMap route unavailable${amapDetail ? `: ${amapDetail}` : ""}. Google fallback is not configured`,
-      );
-      speak("暂时无法规划步行路线", "Walking route unavailable");
-      return;
-    }
-
-    setInstruction(
-      locale === "zh"
-        ? "高德路线不可用，正在尝试 Google…"
-        : "AMap route unavailable. Trying Google…",
-    );
-
-    try {
-      const route = await planGoogleWalkingRoute({
-        key: googleKey,
-        origin,
-        destination,
-        language: locale === "zh" ? "zh-CN" : "en",
-      });
-      if (!route) throw new Error("No Google walking route");
-
-      beginRoute({
-        steps: route.steps.map((step) => ({
-          instruction: step.instruction,
-          distance: step.distance,
-          end_location: step.endLocation,
-        })),
-        distance: route.distanceMeters,
-        duration: route.durationMinutes,
-        provider: "google",
-      });
-    } catch {
-      setState("error");
-      setRouteProvider(null);
-      setInstruction(
-        locale === "zh"
-          ? "高德和 Google 暂时都无法规划路线"
-          : "AMap and Google routes are currently unavailable",
-      );
-      speak("暂时无法规划步行路线", "Walking route unavailable");
-    }
-  };
-
-  const tryGoogleFromBrowserLocation = (amapDetail?: string) => {
-    geolocationRef.current = null;
-    if (!navigator.geolocation) {
-      setState("error");
-      setInstruction(
-        locale === "zh"
-          ? "浏览器不支持定位，无法尝试 Google 路线"
-          : "Browser location is unavailable, so Google routing cannot start",
-      );
-      return;
-    }
-
-    setInstruction(
-      locale === "zh"
-        ? "正在取得位置并尝试 Google…"
-        : "Getting your location and trying Google…",
-    );
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        void tryGoogleRoute(
-          [position.coords.longitude, position.coords.latitude],
-          amapDetail,
-        );
-      },
-      () => {
-        setState("error");
-        setInstruction(
-          locale === "zh"
-            ? "无法取得位置，请检查定位权限"
-            : "Location unavailable. Check location permission",
-        );
-      },
-      { enableHighAccuracy: true, timeout: 10_000 },
-    );
-  };
-
+  const announce = (text: string) => { setMessage(text); if (text !== lastSpoken.current) speak(text); };
   const start = async () => {
-    const legacyEnvironment = (import.meta as ImportMeta & {
-      env?: Record<string, string | undefined>;
-    }).env;
-    const key = (
-      process.env.NEXT_PUBLIC_AMAP_KEY ?? legacyEnvironment?.VITE_AMAP_KEY
-    )?.trim();
-
-    clearTracking();
+    const run = ++generation.current;
+    if (timer.current) clearTimeout(timer.current);
     window.speechSynthesis?.cancel();
-    setState("loading");
-    setInstruction(locale === "zh" ? "正在规划路线…" : "Planning route…");
-    setDistanceMeters(null);
-    setDurationMinutes(null);
-    setRouteProvider(null);
-    speak(
-      `正在规划前往${spot.name}的路线`,
-      `Planning a route to ${spot.nameEn}`,
-    );
-
-    if (!key) {
-      tryGoogleFromBrowserLocation("AMap is not configured");
-      return;
-    }
-
+    setState("loading"); setRoute(null); setRemaining(null); setOrigin(null); setCurrentStep(0); setAccuracy(undefined); setSpeechError(false);
+    announce(localized("正在定位并规划步行路线…", "Finding your location and planning a walking route…"));
     try {
-      const securityCode = process.env.NEXT_PUBLIC_AMAP_SECURITY_CODE?.trim();
-      if (securityCode) {
-        window._AMapSecurityConfig = { securityJsCode: securityCode };
+      const fix = await getLocation();
+      if (generation.current !== run) return;
+      setAccuracy(fix.accuracy);
+      if (!usableAccuracy(fix.accuracy)) {
+        setState("error"); announce(localized("定位精度不足，暂不开始导航。请到开阔处重试。", "Location accuracy is too low to start. Move to an open area and retry.")); return;
       }
-
-      const { load } = await import("@amap/amap-jsapi-loader");
-      const AMap = (await load({
-        key,
-        version: "2.0",
-        plugins: ["AMap.Geolocation", "AMap.Walking"],
-      })) as AMapNamespace;
-
-      const geolocation = new AMap.Geolocation({
-        enableHighAccuracy: true,
-        timeout: 10_000,
-      });
-      geolocationRef.current = geolocation;
-
-      geolocation.getCurrentPosition((locationStatus, locationResult) => {
-        const origin = readCoordinate(locationResult.position);
-        if (locationStatus !== "complete" || !origin) {
-          const detail =
-            locationResult.message ??
-            locationResult.originMessage ??
-            locationResult.info;
-          tryGoogleFromBrowserLocation(detail ?? locationStatus);
-          return;
-        }
-
-        const walking = new AMap.Walking();
-        routeTimeoutRef.current = setTimeout(() => {
-          routeTimeoutRef.current = null;
-          void tryGoogleRoute(origin, "AMap route timeout");
-        }, AMAP_ROUTE_TIMEOUT_MS);
-        walking.search(
-          new AMap.LngLat(origin[0], origin[1]),
-          new AMap.LngLat(destination[0], destination[1]),
-          (routeStatus, routeResult) => {
-            if (!routeTimeoutRef.current) return;
-            clearTimeout(routeTimeoutRef.current);
-            routeTimeoutRef.current = null;
-            const route = routeResult.routes?.[0];
-            const steps = route?.steps?.filter((step) => step.instruction) ?? [];
-            if (routeStatus !== "complete" || !route || steps.length === 0) {
-              void tryGoogleRoute(
-                origin,
-                routeResult.info ?? routeResult.message ?? routeStatus,
-              );
-              return;
+      setOrigin(fix.coordinate);
+      const planned = await planWalkingRoute(fix.coordinate, destination.coordinate);
+      if (generation.current !== run) return;
+      // Reject routes whose snapped start/end are far from the requested points.
+      if (distanceInMeters(planned.path[0], fix.coordinate) > 100 || distanceInMeters(planned.path.at(-1)!, destination.coordinate) > 100) {
+        setState("error"); announce(localized("路线起终点与定位点相距过远，请在高德地图中核对入口。", "The route endpoints are too far from the requested locations. Check the entrance in AMap.")); return;
+      }
+      setRoute(planned); setRemaining(planned.distance); setState("active");
+      announce(planned.steps[0].instruction);
+      let stepIndex = 0;
+      let arrivalCount = 0;
+      const check = async () => {
+        try {
+          const next = await getLocation();
+          if (generation.current !== run) return;
+          setAccuracy(next.accuracy);
+          if (!usableAccuracy(next.accuracy)) {
+            arrivalCount = 0; setState("uncertain"); setRemaining(null);
+            announce(localized("定位信号变弱，方向提示已暂停，请先在安全处停下。", "Location accuracy dropped. Directions are paused; stop somewhere safe."));
+          } else {
+            const progress = routeProgress(next.coordinate, planned.path);
+            if (progress.deviation > Math.max(45, next.accuracy! * 2)) {
+              setState("off-route"); setRemaining(null);
+              announce(localized("当前位置偏离规划路线，请先停在安全处，再重新规划。", "You appear to be off route. Stop somewhere safe and replan.")); return;
             }
-
-            beginRoute({
-              steps,
-              distance: Math.round(route.distance ?? 0),
-              duration: Math.max(1, Math.round((route.time ?? 0) / 60)),
-              provider: "amap",
-            });
-          },
-        );
-      });
-    } catch {
-      tryGoogleFromBrowserLocation("AMap failed to load");
+            setRemaining(Math.round(progress.remaining / Math.max(1, progress.total) * planned.distance));
+            const near = confidentlyNear(next.coordinate, destination.coordinate, next.accuracy, 35) && progress.remaining < 60;
+            arrivalCount = near ? arrivalCount + 1 : 0;
+            if (arrivalCount >= 2) {
+              setState("arrived"); setRemaining(0);
+              announce(spot.walkingDestination ? localized("已到花港观鱼码头附近，尚未抵达三潭印月。请向工作人员确认乘船安排。", "You are near Huagang Guanyu pier, not the island. Ask staff about your boat.") : localized(`已到${spot.name}附近，请核对现场入口。`, `You are near ${spot.nameEn}. Confirm the entrance on site.`)); return;
+            }
+            const step = planned.steps[stepIndex];
+            if (stepIndex < planned.steps.length - 1 && confidentlyNear(next.coordinate, step.path.at(-1)!, next.accuracy, 30)) stepIndex++;
+            setCurrentStep(stepIndex); setState("active");
+            announce(planned.steps[stepIndex].instruction);
+          }
+          timer.current = setTimeout(check, 8_000);
+        } catch (error) {
+          if (generation.current !== run) return;
+          setState("error"); setRemaining(null); announce(mapErrorMessage(error, locale));
+        }
+      };
+      timer.current = setTimeout(check, 8_000);
+    } catch (error) {
+      if (generation.current !== run) return;
+      setState("error"); announce(mapErrorMessage(error, locale));
     }
   };
 
-  const repeat = () => {
-    if (!instruction) return;
-    speak(instruction, instruction);
-  };
-
-  return (
-    <>
-      <button
-        type="button"
-        className="scene-go"
-        onClick={start}
-        disabled={state === "loading"}
-      >
-        {state === "loading"
-          ? locale === "zh"
-            ? "规划中…"
-            : "Planning…"
-          : locale === "zh"
-            ? "去这里"
-            : "Go"}
-      </button>
-
-      {state !== "idle" ? (
-        <section className="walking-guide-panel" aria-labelledby="walking-guide-title">
-          <div className="walking-guide-copy">
-            <h2 id="walking-guide-title">
-              {locale === "zh" ? `前往${spot.name}` : `To ${spot.nameEn}`}
-            </h2>
-            <p role="status" aria-live="polite">
-              {instruction}
-            </p>
-            {distanceMeters !== null ? (
-              <p className="walking-guide-meta">
-                {locale === "zh" ? `剩余约 ${distanceMeters} 米` : `About ${distanceMeters} m left`}
-                {durationMinutes !== null
-                  ? locale === "zh"
-                    ? ` · 约 ${durationMinutes} 分钟`
-                    : ` · About ${durationMinutes} min`
-                  : ""}
-                {routeProvider === "google" ? " · Google" : ""}
-              </p>
-            ) : null}
-          </div>
-
-          <div className="walking-guide-actions">
-            {state === "error" ? (
-              <button type="button" onClick={start}>
-                {locale === "zh" ? "重试" : "Retry"}
-              </button>
-            ) : state === "active" || state === "arrived" ? (
-              <button type="button" onClick={repeat}>
-                {locale === "zh" ? "重复" : "Repeat"}
-              </button>
-            ) : null}
-            <button type="button" className="walking-guide-stop" onClick={stop}>
-              {locale === "zh" ? "停止" : "Stop"}
-            </button>
-          </div>
-
-        </section>
-      ) : null}
-    </>
-  );
+  const parameters = new URLSearchParams({ to: `${destination.coordinate[0]},${destination.coordinate[1]},${destination.name}`, mode: "walk", coordinate: "gaode", src: "bri-jing.com", callnative: "1" });
+  if (origin) parameters.set("from", `${origin[0]},${origin[1]},当前位置`);
+  return <dialog ref={dialog} className="walking-guide-panel" aria-labelledby={`walking-title-${spot.id}`} onCancel={(event) => { event.preventDefault(); onClose(); }}>
+    <div className="walking-guide-copy">
+      <p className="eyebrow">{localized("高德 · 步行路线", "AMap · Walking route")}</p>
+      <h2 id={`walking-title-${spot.id}`}>{localized(`前往${destination.name}`, `To ${destination.nameEn}`)}</h2>
+      <p className="walking-note">{visitNotes[spot.id]?.[locale]}</p>
+      <p role="status" lang={state === "active" ? "zh-CN" : undefined}>{message || localized("点击下方按钮，允许定位后规划路线。", "Use the button below and allow location to plan your walk.")}</p>
+      {remaining !== null && <p className="walking-guide-meta">{localized(`沿路线剩余约 ${remaining} 米`, `About ${remaining} m along the route`)}{route && ` · ${localized(`全程预计 ${Math.max(1, Math.ceil(route.seconds / 60))} 分钟`, `Initial estimate: ${Math.max(1, Math.ceil(route.seconds / 60))} min`)}`}</p>}
+      {accuracy !== undefined && Number.isFinite(accuracy) && <p className="walking-guide-meta">{localized(`定位精度约 ${Math.round(accuracy)} 米`, `Location accuracy: about ${Math.round(accuracy)} m`)}</p>}
+      {speechError && <p role="status">{localized("语音暂不可用，请查看文字步骤或使用屏幕阅读器。", "Audio is unavailable; use the written steps or your screen reader.")}</p>}
+      {route && <details><summary>{localized("查看全部步行步骤", "All walking steps (Chinese)")}</summary><ol className="route-steps" lang="zh-CN">{route.steps.map((step, index) => <li key={index} aria-current={index === currentStep && state === "active" ? "step" : undefined}>{step.instruction}</li>)}</ol></details>}
+      <p className="walking-note">{localized("这是普通步行路线，未核验盲道、台阶和临时障碍。请结合日常出行辅助及现场指引；保持页面在前台。", "This is a standard walking route; tactile paving, steps and temporary obstacles are not verified. Use your usual mobility support and on-site guidance. Keep this page in the foreground.")}</p>
+      <a className="map-link" href={`https://uri.amap.com/navigation?${parameters}`} target="_blank" rel="noreferrer">{localized("在高德地图中打开（新窗口）", "Open in AMap (new window)")}</a>
+      {!origin && <p className="walking-note">{localized("手机高德可使用当前位置；电脑端请在打开的地图中补充起点。", "Mobile AMap can use your location; on desktop, enter your starting point.")}</p>}
+    </div>
+    <div className="walking-guide-actions">
+      {state !== "loading" && state !== "arrived" && <button type="button" onClick={start}>{state === "idle" ? localized("定位并规划", "Plan my walk") : localized("重新规划", "Replan")}</button>}
+      {message && state !== "loading" && <button type="button" onClick={() => speak(message)}>{localized("重复提示", "Repeat")}</button>}
+      <button type="button" className="walking-guide-stop" onClick={onClose}>{localized("停止并关闭", "Stop and close")}</button>
+    </div>
+  </dialog>;
 }
