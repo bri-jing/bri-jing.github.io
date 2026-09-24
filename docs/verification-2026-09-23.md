@@ -4,10 +4,10 @@
 
 - 线上仓库：`bri-jing/bri-jing.github.io`。
 - GitHub Pages：workflow 模式，`main`，域名 `bri-jing.com`。
-- 线上最近成功部署：[30738987362](https://github.com/bri-jing/bri-jing.github.io/actions/runs/30738987362)。
-- 线上与本地修改前均为 `d12f16169560e82df0485514460229f589a9af44`。
-- `https://bri-jing.com/` 返回 HTTP 200，浏览器能加载旧版首页和四景入口。
-- 所有新增修改目前在本地工作区，尚未推送到生产 `main`。
+- 线上最近成功部署：[35949717572](https://github.com/bri-jing/bri-jing.github.io/actions/runs/35949717572)。
+- 生产 `main` 与本地提交均为 `23d71c62cbd1661b3d5b8564c23bdec8f39742ed`。
+- `https://bri-jing.com/` 返回 HTTP 200，并直接显示完整十景入口。
+- 十个景点详情页均已在线返回 HTTP 200。
 
 ## 已完成
 
@@ -31,17 +31,13 @@
 
 本地检查证据位于忽略提交的 `output/playwright/`，包含桌面/手机版截图和脱敏测试结果。
 
-## 真实高德接口阻塞
+## 真实高德接口验证
 
-线上 JS SDK 可以加载，但对十个步行目的地的实际 `AMap.Walking` 请求全部返回 `error`。进一步获取脱敏错误码，结果为 `USERKEY_PLAT_NOMATCH`。现有配置可以用于 Web 服务景点查询，却不能用于当前网页的 JS 步行接口。
+首次发布后，线上安全码已正确注入，但 Key 指纹与本地当前有效 Key 不一致，真实 `AMap.Walking` 请求返回 `USERKEY_PLAT_NOMATCH`。将本地有效 Key 安全同步到 GitHub Actions Secret 后，重新部署 [35949717572](https://github.com/bri-jing/bri-jing.github.io/actions/runs/35949717572) 成功。
 
-2026-09-24 已将本地现有 `VITE_AMAP_KEY` 通过标准输入同步到 GitHub Actions Secret，并手动触发 [Pages 部署 35894936711](https://github.com/bri-jing/bri-jing.github.io/actions/runs/35894936711)，部署成功。线上 AMap 脚本所用 Key 与本地 Key 的 SHA-256 指纹一致，证明注入已生效；重新实测路线仍返回 `USERKEY_PLAT_NOMATCH`，因此剩余问题在高德控制台的平台类型或配套安全配置，不是环境变量未注入。
+重新加载生产页面后，线上 Key 与安全码的长度和 SHA-256 脱敏指纹均与本地一致。使用断桥附近到平湖秋月的公开坐标实测 `AMap.Walking`，接口返回 `complete` / `ok`，路线约 828 米、662 秒，共 2 段步骤。密钥值未写入报告、代码或测试输出。
 
-官方解释：[请求 Key 与绑定平台不符](https://developer.amap.com/api/javascript-api-v2/guide/abc/errorcode)。
-
-需要维护者提供匹配的 **Web端（JS API）Key**，设置 `.env.local` 的 `NEXT_PUBLIC_AMAP_KEY`，并按高德要求配置安全代理 `NEXT_PUBLIC_AMAP_SERVICE_HOST`，或配套 `NEXT_PUBLIC_AMAP_SECURITY_CODE`。来源限制应允许 `bri-jing.com` 和开发域名。部署时更新工作流使用的 GitHub Secret `VITE_AMAP_KEY`，及需要的安全配置。密钥不应写入报告、代码或聊天。
-
-取得正确配置后仍须重新实测十条真实路线、设备定位权限、路线起终点与实际入口，才能将接口验收改为通过。
+该结果证明生产环境的高德 Web JS API、配套安全码和步行规划接口可以协同工作。浏览器定位仍取决于用户授权和设备精度；本次桌面测试曾得到约 43 米精度，页面按安全阈值阻止直接开始导航，行为符合设计。
 
 ## 不能远程确认的事项
 
