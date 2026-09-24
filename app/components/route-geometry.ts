@@ -9,7 +9,7 @@ export function readCoordinate(value: unknown): Coordinate | null {
   return [lng, lat];
 }
 
-export function usableAccuracy(accuracy: number | undefined, maximum = 30) {
+export function usableAccuracy(accuracy: number | undefined, maximum = Infinity) {
   return typeof accuracy === "number" && Number.isFinite(accuracy) && accuracy >= 0 && accuracy <= maximum;
 }
 

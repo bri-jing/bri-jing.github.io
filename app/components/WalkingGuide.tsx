@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { distanceInMeters, type Coordinate, type ScenicSpotZone } from "../data/scenic-spots";
-import { visitNotes } from "../data/visit-notes";
 import { useI18n } from "../i18n";
 import { getLocation, mapErrorMessage, planWalkingRoute, type WalkingRoute } from "./amap-service";
 import { confidentlyNear, routeProgress, usableAccuracy } from "./route-geometry";
@@ -62,15 +61,11 @@ export default function WalkingGuide({ spot, onClose }: { spot: ScenicSpotZone; 
       if (generation.current !== run) return;
       setAccuracy(fix.accuracy);
       if (!usableAccuracy(fix.accuracy)) {
-        setState("error"); announce(localized("定位精度不足，暂不开始导航。请到开阔处重试。", "Location accuracy is too low to start. Move to an open area and retry.")); return;
+        setState("error"); announce(localized("定位失败，请重试。", "Location failed. Try again.")); return;
       }
       setOrigin(fix.coordinate);
       const planned = await planWalkingRoute(fix.coordinate, destination.coordinate);
       if (generation.current !== run) return;
-      // Reject routes whose snapped start/end are far from the requested points.
-      if (distanceInMeters(planned.path[0], fix.coordinate) > 100 || distanceInMeters(planned.path.at(-1)!, destination.coordinate) > 100) {
-        setState("error"); announce(localized("路线起终点与定位点相距过远，请在高德地图中核对入口。", "The route endpoints are too far from the requested locations. Check the entrance in AMap.")); return;
-      }
       setRoute(planned); setRemaining(planned.distance); setState("active");
       announce(planned.steps[0].instruction);
       let stepIndex = 0;
@@ -82,12 +77,12 @@ export default function WalkingGuide({ spot, onClose }: { spot: ScenicSpotZone; 
           setAccuracy(next.accuracy);
           if (!usableAccuracy(next.accuracy)) {
             arrivalCount = 0; setState("uncertain"); setRemaining(null);
-            announce(localized("定位信号变弱，方向提示已暂停，请先在安全处停下。", "Location accuracy dropped. Directions are paused; stop somewhere safe."));
+            announce(localized("定位暂时不可用，正在重试。", "Location is temporarily unavailable. Retrying."));
           } else {
             const progress = routeProgress(next.coordinate, planned.path);
             if (progress.deviation > Math.max(45, next.accuracy! * 2)) {
               setState("off-route"); setRemaining(null);
-              announce(localized("当前位置偏离规划路线，请先停在安全处，再重新规划。", "You appear to be off route. Stop somewhere safe and replan.")); return;
+              announce(localized("已偏离路线，请重新规划。", "You are off route. Replan.")); return;
             }
             setRemaining(Math.round(progress.remaining / Math.max(1, progress.total) * planned.distance));
             const near = confidentlyNear(next.coordinate, destination.coordinate, next.accuracy, 35) && progress.remaining < 60;
@@ -97,7 +92,7 @@ export default function WalkingGuide({ spot, onClose }: { spot: ScenicSpotZone; 
               announce(spot.walkingDestination ? localized("已到花港观鱼码头附近，尚未抵达三潭印月。请向工作人员确认乘船安排。", "You are near Huagang Guanyu pier, not the island. Ask staff about your boat.") : localized(`已到${spot.name}附近，请核对现场入口。`, `You are near ${spot.nameEn}. Confirm the entrance on site.`)); return;
             }
             const step = planned.steps[stepIndex];
-            if (stepIndex < planned.steps.length - 1 && confidentlyNear(next.coordinate, step.path.at(-1)!, next.accuracy, 30)) stepIndex++;
+            if (stepIndex < planned.steps.length - 1 && distanceInMeters(next.coordinate, step.path.at(-1)!) <= Math.max(30, next.accuracy!)) stepIndex++;
             setCurrentStep(stepIndex); setState("active");
             announce(planned.steps[stepIndex].instruction);
           }
@@ -118,20 +113,16 @@ export default function WalkingGuide({ spot, onClose }: { spot: ScenicSpotZone; 
   if (origin) parameters.set("from", `${origin[0]},${origin[1]},当前位置`);
   return <dialog ref={dialog} className="walking-guide-panel" aria-labelledby={`walking-title-${spot.id}`} onCancel={(event) => { event.preventDefault(); onClose(); }}>
     <div className="walking-guide-copy">
-      <p className="eyebrow">{localized("高德 · 步行路线", "AMap · Walking route")}</p>
       <h2 id={`walking-title-${spot.id}`}>{localized(`前往${destination.name}`, `To ${destination.nameEn}`)}</h2>
-      <p className="walking-note">{visitNotes[spot.id]?.[locale]}</p>
-      <p role="status" lang={state === "active" ? "zh-CN" : undefined}>{message || localized("点击下方按钮，允许定位后规划路线。", "Use the button below and allow location to plan your walk.")}</p>
+      <p role="status" lang={state === "active" ? "zh-CN" : undefined}>{message || localized("点击“开始导航”", "Select Start navigation")}</p>
       {remaining !== null && <p className="walking-guide-meta">{localized(`沿路线剩余约 ${remaining} 米`, `About ${remaining} m along the route`)}{route && ` · ${localized(`全程预计 ${Math.max(1, Math.ceil(route.seconds / 60))} 分钟`, `Initial estimate: ${Math.max(1, Math.ceil(route.seconds / 60))} min`)}`}</p>}
       {accuracy !== undefined && Number.isFinite(accuracy) && <p className="walking-guide-meta">{localized(`定位精度约 ${Math.round(accuracy)} 米`, `Location accuracy: about ${Math.round(accuracy)} m`)}</p>}
       {speechError && <p role="status">{localized("语音暂不可用，请查看文字步骤或使用屏幕阅读器。", "Audio is unavailable; use the written steps or your screen reader.")}</p>}
       {route && <details><summary>{localized("查看全部步行步骤", "All walking steps (Chinese)")}</summary><ol className="route-steps" lang="zh-CN">{route.steps.map((step, index) => <li key={index} aria-current={index === currentStep && state === "active" ? "step" : undefined}>{step.instruction}</li>)}</ol></details>}
-      <p className="walking-note">{localized("这是普通步行路线，未核验盲道、台阶和临时障碍。请结合日常出行辅助及现场指引；保持页面在前台。", "This is a standard walking route; tactile paving, steps and temporary obstacles are not verified. Use your usual mobility support and on-site guidance. Keep this page in the foreground.")}</p>
       <a className="map-link" href={`https://uri.amap.com/navigation?${parameters}`} target="_blank" rel="noreferrer">{localized("在高德地图中打开（新窗口）", "Open in AMap (new window)")}</a>
-      {!origin && <p className="walking-note">{localized("手机高德可使用当前位置；电脑端请在打开的地图中补充起点。", "Mobile AMap can use your location; on desktop, enter your starting point.")}</p>}
     </div>
     <div className="walking-guide-actions">
-      {state !== "loading" && state !== "arrived" && <button type="button" onClick={start}>{state === "idle" ? localized("定位并规划", "Plan my walk") : localized("重新规划", "Replan")}</button>}
+      {state !== "loading" && state !== "arrived" && <button type="button" onClick={start}>{state === "idle" ? localized("开始导航", "Start navigation") : localized("重新规划", "Replan")}</button>}
       {message && state !== "loading" && <button type="button" onClick={() => speak(message)}>{localized("重复提示", "Repeat")}</button>}
       <button type="button" className="walking-guide-stop" onClick={onClose}>{localized("停止并关闭", "Stop and close")}</button>
     </div>

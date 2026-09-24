@@ -17,9 +17,7 @@ export default function SceneGrid() {
     <div className="page-shell scene-page visual">
       <SiteHeader />
       <main id="main-content" className="scene-main">
-        <p className="eyebrow"><T zh="听见湖山 · 无障碍语音导览" en="Listen to West Lake · Accessible audio guides" /></p>
         <h1><T zh="西湖十景" en="Ten West Lake Scenes" /></h1>
-        <p className="scene-intro"><T zh="选一处风景，听一段故事。十景均可播放讲解，也可查看文字。" en="Choose a scene and listen to its story, or read the guide at your own pace." /></p>
         {!destination && <LocationGuide />}
         <ol className="ten-scenes">
           {Object.values(visualGuides).map((guide, index) => {
@@ -39,7 +37,6 @@ export default function SceneGrid() {
             );
           })}
         </ol>
-        <p className="site-note"><T zh="定位仅在你开启后使用。普通步行路线无法判断盲道连续性、临时围挡或所有台阶，请结合手杖、导盲犬、同行协助与现场指引。" en="Location is used only when you enable it. Standard walking routes do not verify tactile paving, temporary barriers or every step. Use your usual mobility aids and on-site guidance." /></p>
       </main>
       {destination && <WalkingGuide key={destination.id} spot={destination} onClose={() => setDestination(null)} />}
     </div>
