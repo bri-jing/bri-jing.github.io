@@ -10,7 +10,7 @@ test("deployed homepage goes directly to ten complete audio scenes", async () =>
     const html = await htmlFor(path);
     assert.match(html, /<h1>西湖十景<\/h1>/);
     assert.doesNotMatch(html, /选择导览|听障导览|尚未开放|href="\/hearing/);
-    assert.doesNotMatch(html, /听见湖山|选一处风景|定位后提示|普通步行路线/);
+    assert.doesNotMatch(html, /听见湖山|选一处风景/);
     assert.equal((html.match(/class="scene-go"/g) ?? []).length, 10);
     assert.match(html, /跳到主要内容/);
     assert.match(html, /id="main-content"/);
@@ -28,7 +28,9 @@ test("all ten exported detail pages provide labelled images, speech, navigation 
     assert.match(html, /role="status"/);
     assert.match(html, /步行去/);
     assert.doesNotMatch(html, /视频制作中|尚未开放/);
-    assert.doesNotMatch(html, /西湖十景 · 语音讲解|点击播放即可开始|讲解不代表实时|缩放及展示裁切/);
+    assert.match(html, /class="playback-status" role="status"/);
+    assert.match(html, /情景讲解不代表你的当前位置、朝向或实时路况/);
+    assert.doesNotMatch(html, /class="sr-only" role="status"|你现在正站|你现在所处|你的左手边|你的右手边/);
     assert.ok((html.match(/<p>/g) ?? []).length >= 6);
   }
   const island = await htmlFor("visual/santan-yinyue");

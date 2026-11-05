@@ -13,7 +13,7 @@
     "test": "npm run test:unit && npm run build:pages && npm run test:pages",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
-    "test:unit": "node --import tsx --test tests/navigation.test.ts",
+    "test:unit": "node --import tsx --test tests/*.test.ts",
     "test:pages": "node --test tests/rendered-html.test.mjs",
     "dev:pages": "NEXT_TELEMETRY_DISABLED=1 next dev"
   },

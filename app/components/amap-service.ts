@@ -1,5 +1,7 @@
 import { readCoordinate } from "./route-geometry";
-import type { Coordinate } from "../data/scenic-spots";
+import { distanceInMeters, type Coordinate } from "../data/scenic-spots";
+import { createRetryableLoader, ScriptLoadError } from "./retryable-loader";
+import { routeEndpointsMatch } from "./navigation-progress";
 
 export type LocationFix = { coordinate: Coordinate; accuracy?: number };
 export type WalkingStep = { instruction: string; distance: number; path: Coordinate[] };
@@ -24,10 +26,10 @@ export function bounded<T>(operation: Promise<T>, milliseconds = 12_000): Promis
   });
 }
 
-let apiPromise: Promise<AMapAPI> | null = null;
+let callbackSequence = 0;
+let scriptLoader: ReturnType<typeof createRetryableLoader<AMapAPI>> | null = null;
 export async function loadAMap(): Promise<AMapAPI> {
   if (!window.isSecureContext) throw new MapServiceError("insecure");
-  if (apiPromise) return apiPromise;
   const legacy = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
   const key = (process.env.NEXT_PUBLIC_AMAP_KEY || legacy?.VITE_AMAP_KEY)?.trim();
   if (!key) throw new MapServiceError("config");
@@ -35,11 +37,30 @@ export async function loadAMap(): Promise<AMapAPI> {
   const securityJsCode = process.env.NEXT_PUBLIC_AMAP_SECURITY_CODE?.trim();
   if (serviceHost) window._AMapSecurityConfig = { serviceHost };
   else if (securityJsCode) window._AMapSecurityConfig = { securityJsCode };
-  apiPromise = bounded(import("@amap/amap-jsapi-loader").then(({ load }) => load({ key, version: "2.0", plugins: ["AMap.Geolocation", "AMap.Walking"] }))).catch(() => {
-    apiPromise = null;
-    throw new MapServiceError("load");
+  // The stock Loader caches failures and shares one callback across attempts.
+  // Use a fresh callback per script request so retry and late-response ownership are explicit.
+  scriptLoader ??= createRetryableLoader<AMapAPI>((complete, fail) => {
+    const callback = `__brijingAMapReady_${++callbackSequence}`;
+    const globals = window as unknown as Record<string, unknown>;
+    const script = document.createElement("script");
+    script.async = true;
+    globals[callback] = (error?: unknown) => {
+      const api = globals.AMap as AMapAPI | undefined;
+      if (error || !api?.Geolocation || !api?.Walking) fail();
+      else complete(api);
+    };
+    script.onerror = fail;
+    script.src = `https://webapi.amap.com/maps?${new URLSearchParams({ key, v: "2.0", plugin: "AMap.Geolocation,AMap.Walking", callback })}`;
+    document.head.appendChild(script);
+    return () => {
+      // A removed script may already be executing. Leave a harmless callback tombstone.
+      globals[callback] = () => undefined;
+      script.onerror = null;
+      script.remove();
+    };
   });
-  return apiPromise;
+  try { return await scriptLoader(); }
+  catch (error) { throw new MapServiceError(error instanceof ScriptLoadError ? error.code : "load"); }
 }
 
 export async function getLocation(): Promise<LocationFix> {
@@ -53,16 +74,39 @@ export async function getLocation(): Promise<LocationFix> {
   })));
 }
 
+export function parseWalkingRoute(result: unknown, origin: Coordinate, destination: Coordinate): WalkingRoute | null {
+  try {
+    if (!result || typeof result !== "object") return null;
+    const routes = (result as { routes?: unknown }).routes;
+    if (!Array.isArray(routes) || !routes[0] || typeof routes[0] !== "object") return null;
+    const route = routes[0] as { distance?: number; time?: number; steps?: unknown };
+    if (!Number.isFinite(route.distance) || route.distance! < 0 || !Number.isFinite(route.time) || route.time! < 0 || !Array.isArray(route.steps) || !route.steps.length) return null;
+    const steps: WalkingStep[] = [];
+    for (const raw of route.steps) {
+      if (!raw || typeof raw !== "object") return null;
+      const step = raw as { instruction?: unknown; distance?: number; path?: unknown };
+      if (typeof step.instruction !== "string" || !Array.isArray(step.path) || step.path.length < 2 || !Number.isFinite(step.distance) || step.distance! < 0) return null;
+      const instruction = step.instruction.replace(/<[^>]*>/g, "").trim();
+      const coordinates = step.path.map(readCoordinate);
+      if (!instruction || coordinates.some((point) => point === null)) return null;
+      steps.push({ instruction, distance: step.distance!, path: coordinates as Coordinate[] });
+    }
+    const path = steps.flatMap((step) => step.path);
+    const planned = { distance: route.distance!, seconds: route.time!, steps, path };
+    if (!routeEndpointsMatch(planned, origin, destination)
+      || !path.some((point, index) => index > 0 && distanceInMeters(path[index - 1], point) > 0.01)
+      || steps.some((step, index) => index > 0 && distanceInMeters(steps[index - 1].path.at(-1)!, step.path[0]) > 30)) return null;
+    return planned;
+  } catch { return null; }
+}
+
 export async function planWalkingRoute(origin: Coordinate, destination: Coordinate): Promise<WalkingRoute> {
   const api = await loadAMap();
   return bounded(new Promise<WalkingRoute>((resolve, reject) => {
     new api.Walking().search(origin, destination, (status, result) => {
-      const route = result?.routes?.[0];
-      if (status !== "complete" || !route || !Number.isFinite(route.distance) || !Number.isFinite(route.time)) { reject(new MapServiceError("route")); return; }
-      const steps = (route.steps ?? []).map((step) => ({ instruction: (step.instruction ?? "").replace(/<[^>]*>/g, "").trim(), distance: step.distance ?? 0, path: (step.path ?? []).map(readCoordinate).filter((point): point is Coordinate => point !== null) }));
-      const path = steps.flatMap((step) => step.path);
-      if (!steps.length || steps.some((step) => !step.instruction || step.path.length < 2) || path.length < 2 || route.distance! < 0 || route.time! < 0) { reject(new MapServiceError("route")); return; }
-      resolve({ distance: route.distance!, seconds: route.time!, steps, path });
+      const planned = status === "complete" ? parseWalkingRoute(result, origin, destination) : null;
+      if (!planned) { reject(new MapServiceError("route")); return; }
+      resolve(planned);
     });
   }));
 }

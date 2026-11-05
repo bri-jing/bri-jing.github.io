@@ -814,6 +814,11 @@ dialog.walking-guide-panel::backdrop { background: rgba(8, 24, 20, .6); }
 .route-steps { padding-left: 28px; line-height: 1.8; }
 .route-steps li { padding: 8px 4px; }
 .route-steps [aria-current] { background: var(--green-soft); font-weight: 700; }
+.visit-note, .walking-note { font-size: 17px; line-height: 1.7; }
+.walking-guide-copy > .walking-note { font-size: 17px !important; font-weight: 400 !important; }
+.playback-status { margin: 0; font-size: 18px; line-height: 1.7; }
+.playback-recovery { display: flex; flex-wrap: wrap; gap: 12px; }
+.playback-recovery button { min-height: 48px; padding: 10px 16px; border: 2px solid var(--green); color: var(--green); cursor: pointer; }
 @media (max-width: 1200px) { .ten-scenes { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 760px) {
   .ten-scenes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
