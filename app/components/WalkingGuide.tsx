@@ -5,7 +5,7 @@ import { distanceInMeters, type ScenicSpotZone } from "../data/scenic-spots";
 import { visitNotes } from "../data/visit-notes";
 import { useI18n } from "../i18n";
 import { getLocation, mapErrorMessage, planWalkingRoute, type WalkingRoute } from "./amap-service";
-import { confidentlyNear, usableAccuracy } from "./route-geometry";
+import { confidentlyNear, MAX_NAVIGATION_ACCURACY, usableAccuracy } from "./route-geometry";
 import { NavigationProgress, officialWalkingLink } from "./navigation-progress";
 
 type State = "idle" | "loading" | "active" | "uncertain" | "off-route" | "arrived" | "error";
@@ -92,11 +92,21 @@ export default function WalkingGuide({ spot, onClose }: { spot: ScenicSpotZone; 
     setState("loading"); setRoute(null); setRemaining(null); setCurrentStep(0); setAccuracy(undefined); setSpeechError(false);
     announce(localized("请先在安全位置停下。正在定位并规划普通步行路线…", "Stop somewhere safe. Finding your position and planning a standard walking route…"));
     try {
-      const fix = await getLocation();
+      let fix = await getLocation();
       if (generation.current !== run) return;
       setAccuracy(fix.accuracy);
+      for (let retry = 0; retry < 2 && !usableAccuracy(fix.accuracy); retry++) {
+        announce(localized("正在尝试获取更精确的位置，请稍候。", "Trying to get a more accurate location. Please wait."));
+        await new Promise<void>((resolve) => setTimeout(resolve, 1_500));
+        if (generation.current !== run) return;
+        fix = await getLocation();
+        if (generation.current !== run) return;
+        setAccuracy(fix.accuracy);
+      }
       if (!usableAccuracy(fix.accuracy)) {
-        setState("error"); announce(localized("定位精度不足，方向指引未开始。请到开阔处重试。", "Accuracy is too low. Directions have not started; retry in an open area.")); return;
+        setState("error");
+        announce(localized(`定位精度不足，需要误差不超过 ${MAX_NAVIGATION_ACCURACY} 米。请在手机设置中允许浏览器使用精确位置，到开阔处重新规划，或点下方链接用高德地图导航。`, `Directions require a location accurate to within ${MAX_NAVIGATION_ACCURACY} m. Allow precise location for your browser and replan outdoors, or open AMap below.`));
+        return;
       }
       const planned = await planWalkingRoute(fix.coordinate, destination.coordinate);
       if (generation.current !== run) return;
