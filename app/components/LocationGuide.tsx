@@ -30,14 +30,14 @@ export default function LocationGuide() {
       try {
         const fix = await getLocation();
         if (run !== generation.current) return;
-        if (usableAccuracy(fix.accuracy)) {
+        if (usableAccuracy(fix.accuracy, 50)) {
           const nearest = scenicSpotZones.map((spot) => ({ spot, distance: distanceInMeters(fix.coordinate, spot.coordinate) })).sort((a, b) => a.distance - b.distance)[0];
           const isNear = confidentlyNear(fix.coordinate, nearest.spot.coordinate, fix.accuracy, nearest.spot.triggerRadiusMeters);
           setNearby(isNear ? nearest.spot : null);
-          setMessage(locale === "zh" ? `最近：${nearest.spot.name}，约 ${Math.round(nearest.distance)} 米` : `Nearest: ${nearest.spot.nameEn}, about ${Math.round(nearest.distance)} m`);
+          setMessage(locale === "zh" ? `最近：${nearest.spot.name}，直线约 ${Math.round(nearest.distance)} 米。定位精度约 ${Math.round(fix.accuracy!)} 米。${isNear ? "已在附近，可打开讲解。" : "尚不能确认在附近。"}` : `Nearest: ${nearest.spot.nameEn}, about ${Math.round(nearest.distance)} m in a straight line. Accuracy: ${Math.round(fix.accuracy!)} m.${isNear ? " You are nearby; open the guide." : " Nearby arrival is not confirmed."}`);
         } else {
           setNearby(null);
-          setMessage(locale === "zh" ? "定位失败，请重试" : "Location failed. Try again.");
+          setMessage(locale === "zh" ? "定位较粗略，暂不能确认附近景点。请到开阔处，正在重新确认。" : "Position is too coarse to confirm nearby scenes. Move to an open area while location is checked.");
         }
         timer.current = setTimeout(check, 12_000);
       } catch (error) {

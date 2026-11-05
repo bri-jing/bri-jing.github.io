@@ -9,15 +9,16 @@ export function readCoordinate(value: unknown): Coordinate | null {
   return [lng, lat];
 }
 
-export function usableAccuracy(accuracy: number | undefined, maximum = Infinity) {
+export const MAX_NAVIGATION_ACCURACY = 30;
+
+export function usableAccuracy(accuracy: number | undefined, maximum = MAX_NAVIGATION_ACCURACY) {
   return typeof accuracy === "number" && Number.isFinite(accuracy) && accuracy >= 0 && accuracy <= maximum;
 }
 
 // Project onto road segments, not a straight line to the destination.
-export function routeProgress(current: Coordinate, path: readonly Coordinate[]) {
+export function routeProjections(current: Coordinate, path: readonly Coordinate[]) {
   let total = 0;
-  let along = 0;
-  let deviation = Infinity;
+  const candidates: Array<{ along: number; deviation: number }> = [];
   for (let index = 1; index < path.length; index++) {
     const a = path[index - 1];
     const b = path[index];
@@ -29,9 +30,16 @@ export function routeProgress(current: Coordinate, path: readonly Coordinate[]) 
     const projected: Coordinate = [a[0] + (b[0] - a[0]) * fraction, a[1] + (b[1] - a[1]) * fraction];
     const segment = distanceInMeters(a, b);
     const distance = distanceInMeters(current, projected);
-    if (distance < deviation) { deviation = distance; along = total + fraction * segment; }
+    if (segment > 0.01) candidates.push({ deviation: distance, along: total + fraction * segment });
     total += segment;
   }
+  return { candidates, total };
+}
+
+export function routeProgress(current: Coordinate, path: readonly Coordinate[]) {
+  const { candidates, total } = routeProjections(current, path);
+  const nearest = candidates.reduce((best, candidate) => candidate.deviation < best.deviation ? candidate : best, { along: 0, deviation: Infinity });
+  const { along, deviation } = nearest;
   return { deviation, remaining: Math.max(0, total - along), total, along };
 }
 
