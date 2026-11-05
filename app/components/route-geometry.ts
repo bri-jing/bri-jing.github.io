@@ -9,7 +9,7 @@ export function readCoordinate(value: unknown): Coordinate | null {
   return [lng, lat];
 }
 
-export const MAX_NAVIGATION_ACCURACY = 30;
+export const MAX_NAVIGATION_ACCURACY = 50;
 
 export function usableAccuracy(accuracy: number | undefined, maximum = MAX_NAVIGATION_ACCURACY) {
   return typeof accuracy === "number" && Number.isFinite(accuracy) && accuracy >= 0 && accuracy <= maximum;
@@ -44,5 +44,5 @@ export function routeProgress(current: Coordinate, path: readonly Coordinate[]) 
 }
 
 export function confidentlyNear(current: Coordinate, destination: Coordinate, accuracy: number | undefined, radius: number) {
-  return usableAccuracy(accuracy) && distanceInMeters(current, destination) + accuracy! <= radius;
+  return usableAccuracy(accuracy, 30) && distanceInMeters(current, destination) + accuracy! <= radius;
 }

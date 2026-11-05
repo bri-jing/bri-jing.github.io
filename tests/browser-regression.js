@@ -14,7 +14,7 @@ async (page) => {
   await cdp.send('Browser.setPermission', { browserContextId: target.targetInfo.browserContextId, permission: { name: 'geolocation' }, setting: 'denied', origin: base });
   await page.addInitScript(() => {
     const delay = window.setTimeout.bind(window);
-    window.setTimeout = (fn, ms, ...args) => delay(fn, ms === 8000 ? 80 : ms === 12000 || ms === 60000 ? 500 : ms, ...args);
+    window.setTimeout = (fn, ms, ...args) => delay(fn, ms === 1500 || ms === 8000 ? 80 : ms === 12000 || ms === 60000 ? 500 : ms, ...args);
     window.__qa = { speech: [], cancellations: 0, speechMode: 'end' };
     let speechToken = 0;
     class Utterance { constructor(text) { this.text = text; } }
@@ -58,12 +58,22 @@ async (page) => {
   const begin = async () => { await page.getByRole('button', { name: '开始导航', exact: true }).click(); await snapshot(); await page.getByRole('button', { name: '重新规划', exact: true }).waitFor({ timeout: 5000 }); await snapshot(); };
   const status = () => page.getByRole('dialog').getByRole('status').first();
 
-  await test('31m, 43m and 500m fixes do not plan or give direction', async () => {
-    for (const accuracy of [31, 43, 500]) {
+  await test('43m fixes can start giving directions', async () => {
+    await setup({ fixes: [fix(origin, 43)] }); await open(); await begin();
+    await status().filter({ hasText: '模拟第一段' }).waitFor();
+  });
+  await test('startup retries coarse fixes and starts when accuracy improves', async () => {
+    await setup({ fixes: [fix(origin, 500), fix(origin, 51), fix(origin, 43)] }); await open(); await begin();
+    await status().filter({ hasText: '模拟第一段' }).waitFor();
+    assert(await page.evaluate(() => window.__qa.speech.includes('正在尝试获取更精确的位置，请稍候。')), 'no retry feedback');
+  });
+  await test('persistent 51m and 500m fixes do not plan or give directions', async () => {
+    for (const accuracy of [51, 500]) {
       await setup({ fixes: [fix(origin, accuracy)] }); await open(); await begin();
       assert((await status().innerText()).includes('定位精度不足'), 'low accuracy not paused');
       assert(await page.locator('[aria-current=step]').count() === 0, 'step advanced');
       assert(await page.evaluate(() => !window.__qa.routeCalls), 'route was planned with poor location');
+      assert(await page.evaluate(() => window.__qa.geoCalls === 3), 'did not stop after three fixes');
     }
     await page.screenshot({ path: 'output/playwright/fix-low-accuracy.png' });
   });

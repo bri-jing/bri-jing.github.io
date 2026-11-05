@@ -14,8 +14,10 @@ test("bad or uncertain positions cannot confirm arrival", () => {
     assert.equal(usableAccuracy(accuracy), false);
     assert.equal(confidentlyNear(target, target, accuracy, 35), false);
   }
-  for (const accuracy of [31, 43, 500]) assert.equal(usableAccuracy(accuracy), false);
+  for (const accuracy of [31, 43, 50]) assert.equal(usableAccuracy(accuracy), true);
+  for (const accuracy of [51, 500]) assert.equal(usableAccuracy(accuracy), false);
   assert.equal(confidentlyNear(target, target, 5, 35), true);
+  assert.equal(confidentlyNear(target, target, 31, 35), false);
   assert.equal(confidentlyNear(target, target, 43, 35), false);
   assert.equal(confidentlyNear([120.1403, 30.24], target, 15, 35), false);
 });
